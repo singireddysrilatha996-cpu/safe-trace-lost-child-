@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeTrace – Login</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  body::before { content:''; position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(230,57,70,.09) 0%,transparent 70%); }
+  .box { background:var(--surface); border:1px solid var(--border); border-radius:22px;
+    padding:48px 44px; width:100%; max-width:430px; animation:up .4s ease; }
+  @keyframes up { from{transform:translateY(22px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .logo { font-family:'Bebas Neue'; font-size:30px; color:var(--red); letter-spacing:4px; text-align:center; margin-bottom:4px; }
+  .logo span { color:var(--text); }
+  .tag { font-size:12px; color:var(--muted); text-align:center; margin-bottom:30px; letter-spacing:1px; }
+  .title { font-family:'Bebas Neue'; font-size:36px; letter-spacing:2px; margin-bottom:4px; }
+  .sub   { font-size:13px; color:var(--muted); margin-bottom:26px; }
+  .demo-box { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:22px; }
+  .demo-box p { font-size:11px; color:var(--muted); margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; }
+  .demo-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .demo-row span { font-family:'Space Mono'; font-size:11px; color:var(--muted); }
+  .fill-btn { background:rgba(230,57,70,.15); border:none; color:var(--red); font-size:11px;
+    cursor:pointer; font-weight:700; padding:4px 10px; border-radius:6px; transition:all .2s; }
+  .fill-btn:hover { background:var(--red); color:#fff; }
+  .eye-wrap { position:relative; }
+  .eye-btn  { position:absolute; right:13px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px; }
+  .footer { text-align:center; margin-top:16px; font-size:13px; color:var(--muted); }
+  .footer a { color:var(--text); text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">Safe<span>Trace</span></div>
+  <div class="tag">Emergency Child Alert Network</div>
+  <div class="title">Welcome Back</div>
+  <div class="sub">Sign in with your registered email and password</div>
+
+  <div class="form-group">
+    <label class="form-label">Email Address</label>
+    <input class="form-input" id="email" type="email" placeholder="your@email.com"
+      onkeydown="if(event.key==='Enter')doLogin()">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Password</label>
+    <div class="eye-wrap">
+      <input class="form-input" id="pass" type="password" placeholder="••••••••"
+        style="padding-right:42px" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="eye-btn" onclick="toggleEye()">👁</button>
+    </div>
+  </div>
+
+  <div class="form-error" id="err"></div>
+  <button class="btn-full" onclick="doLogin()" style="margin-top:10px">Sign In →</button>
+  <div class="footer" style="margin-top:20px">New user? <a href="register.html">Register here</a></div>
+  <div class="footer" style="margin-top:8px"><a href="index.html">← Back to Home</a></div>
+</div>
+
+<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
+<script src="data.js"></script>
+<script>
+  // Already logged in? go home
+  if (getSession()) window.location.replace('index.html');
+
+  function fill(e, p) {
+    document.getElementById('email').value = e;
+    document.getElementById('pass').value  = p;
+    document.getElementById('err').style.display = 'none';
+  }
+  function toggleEye() {
+    var i = document.getElementById('pass');
+    i.type = i.type === 'password' ? 'text' : 'password';
+  }
+  function login() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+
+  const user = users.find(u => u.email === email && u.password === password);
+
+  if (!user) {
+    alert("Invalid credentials");
+    return;
+  }
+
+  if (user.role === "admin") {
+    window.location.href = "admin.html";
+  } else {
+    window.location.href = "index.html";
+  }
+}
+  function doLogin() {
+    var email = document.getElementById('email').value.trim();
+    var pass  = document.getElementById('pass').value;
+    var errEl = document.getElementById('err');
+    errEl.style.display = 'none';
+
+    if (!email || !pass) {
+      errEl.textContent = 'Please enter both email and password.';
+      errEl.style.display = 'block'; return;
+    }
+
+    // loginUser() checks ALL users stored in localStorage
+    var user = loginUser(email, pass);
+
+    if (!user) {
+      errEl.textContent = 'Incorrect email or password. If you just registered, make sure you used the same browser.';
+      errEl.style.display = 'block'; return;
+    }
+
+    setSession(user);
+    toast('Welcome back, ' + user.name.split(' ')[0] + '! Redirecting…', 'success');
+
+    var redirect = sessionStorage.getItem('st_redirect') || 'index.html';
+    sessionStorage.removeItem('st_redirect');
+    setTimeout(function(){ window.location.href = redirect; }, 900);
+  }
+</script>
+</body>
+</html>

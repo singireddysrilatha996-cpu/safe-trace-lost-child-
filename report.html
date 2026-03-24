@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeTrace – Report Missing Child</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .upload-zone { border:2px dashed var(--border); border-radius:12px; padding:36px;
+    text-align:center; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
+  .upload-zone:hover,.upload-zone.drag { border-color:var(--red); background:rgba(230,57,70,.04); }
+  .upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  #photoPreview { width:90px; height:90px; object-fit:cover; border-radius:10px;
+    display:none; border:2px solid var(--border); margin-top:12px; }
+  .step-bar { display:flex; gap:0; margin-bottom:32px; border-radius:10px; overflow:hidden; }
+  .step { flex:1; padding:10px 6px; text-align:center; font-size:12px; font-weight:600;
+    border-bottom:3px solid var(--border); color:var(--muted); transition:all .3s; }
+  .step.done   { border-color:var(--green); color:var(--green); }
+  .step.active { border-color:var(--red);   color:var(--red);   }
+</style>
+</head>
+<body>
+<nav>
+  <a class="nav-logo" href="index.html">Safe<span>Trace</span></a>
+  <div class="nav-links">
+    <a href="index.html">Home</a><a href="missing.html">Missing Children</a>
+    <a href="alerts.html">Live Alerts</a>
+    <a href="report.html" class="active">Report Missing</a>
+    <a href="sighting.html">Report Sighting</a>
+  </div>
+  <div class="nav-actions" id="navGuest" style="display:flex;gap:10px">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions" id="navUser" style="display:none;gap:10px;align-items:center">
+    <span id="navGreet" style="font-size:13px;color:var(--muted)"></span>
+    <button class="btn btn-outline" onclick="doLogout()" style="padding:7px 16px;font-size:12px">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-title">Report <span>Missing</span> Child</div>
+  <div class="page-sub">Every detail matters. Fill this form completely — an alert will be sent automatically when you submit.</div>
+
+  <div class="step-bar">
+    <div class="step active" id="s1">① Child Info</div>
+    <div class="step" id="s2">② Last Seen</div>
+    <div class="step" id="s3">③ Photo</div>
+    <div class="step" id="s4">④ Your Details</div>
+  </div>
+
+  <!-- Child Info -->
+  <div class="card">
+    <div class="card-title">👦 Child Information</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">First Name *</label>
+        <input class="form-input" id="fname" placeholder="Child's first name" oninput="stepDone(1)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Last Name *</label>
+        <input class="form-input" id="lname" placeholder="Child's last name" oninput="stepDone(1)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Age *</label>
+        <input class="form-input" id="age" type="number" min="1" max="17" placeholder="Age in years">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Gender *</label>
+        <select class="form-input" id="gender">
+          <option value="">Select</option>
+          <option>Male</option><option>Female</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Physical Description * <span style="color:var(--muted);font-size:11px">(height, hair, clothing worn, marks…)</span></label>
+        <textarea class="form-input" id="desc" rows="3" placeholder="e.g. 4 feet tall, black hair, blue shirt and grey pants, small birthmark on right arm…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Last Seen -->
+  <div class="card">
+    <div class="card-title">📍 Last Seen Details</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label class="form-label">Last Seen Location *</label>
+        <input class="form-input" id="location" placeholder="Park name, street, landmark, area…" oninput="stepDone(2)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date Last Seen *</label>
+        <input class="form-input" id="date" type="date" oninput="stepDone(2)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Approximate Time</label>
+        <input class="form-input" id="time" type="time">
+      </div>
+      <div class="form-group full">
+        <label class="form-label">Circumstances</label>
+        <textarea class="form-input" id="context" rows="2" placeholder="Was the child alone? Any suspicious persons? What happened?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo -->
+  <div class="card">
+    <div class="card-title">📸 Child Photo <span style="color:var(--muted);font-size:13px;font-family:'DM Sans'">(optional but very helpful)</span></div>
+    <div class="upload-zone" id="uploadZone">
+      <div style="font-size:36px;margin-bottom:10px">📷</div>
+      <div style="font-size:14px;color:var(--muted)"><strong style="color:var(--text)">Click to upload</strong> or drag & drop<br><span style="font-size:12px">JPG, PNG up to 10MB</span></div>
+      <input type="file" id="photoInput" accept="image/*">
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <img id="photoPreview" src="" alt="">
+      <span id="photoName" style="font-size:13px;color:var(--muted)"></span>
+    </div>
+  </div>
+
+  <!-- Reporter -->
+  <div class="card">
+    <div class="card-title">👤 Your Contact Details</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:18px">Authorities may need to contact you for more information.</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Your Full Name *</label>
+        <input class="form-input" id="reporter" placeholder="Your name" oninput="stepDone(4)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number *</label>
+        <input class="form-input" id="phone" type="tel" placeholder="+91 XXXXX XXXXX" oninput="stepDone(4)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Relationship to Child</label>
+        <select class="form-input" id="relation">
+          <option>Parent</option><option>Guardian</option>
+          <option>Relative</option><option>Witness</option><option>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email (optional)</label>
+        <input class="form-input" id="email" type="email" placeholder="your@email.com">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-error" id="err"></div>
+  <button class="btn-full" onclick="submitReport()">🚨 Submit Report — Alert Will Be Sent Automatically</button>
+  <p style="font-size:12px;color:var(--muted);text-align:center;margin-top:12px">False reports may have legal consequences.</p>
+</div>
+
+<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
+<script src="data.js"></script>
+<script>
+  initNav();
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+  function stepDone(n) {
+    var el = document.getElementById('s' + n);
+    if (el) { el.classList.remove('active'); el.classList.add('done'); }
+    var next = document.getElementById('s' + (n + 1));
+    if (next && !next.classList.contains('done')) next.classList.add('active');
+  }
+
+  // Photo preview
+  document.getElementById('photoInput').addEventListener('change', function() {
+    var file = this.files[0]; if (!file) return;
+    var r = new FileReader();
+    r.onload = function(e) {
+      var img = document.getElementById('photoPreview');
+      img.src = e.target.result; img.style.display = 'block';
+      document.getElementById('photoName').textContent = file.name;
+      stepDone(3);
+    };
+    r.readAsDataURL(file);
+  });
+  var zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', function(){ zone.classList.remove('drag'); });
+  zone.addEventListener('drop', function(e){
+    e.preventDefault(); zone.classList.remove('drag');
+    var f = e.dataTransfer.files[0];
+    if (f) { document.getElementById('photoInput').files = e.dataTransfer.files;
+      document.getElementById('photoInput').dispatchEvent(new Event('change')); }
+  });
+
+  function submitReport() {
+    var fname    = document.getElementById('fname').value.trim();
+    var lname    = document.getElementById('lname').value.trim();
+    var age      = document.getElementById('age').value;
+    var gender   = document.getElementById('gender').value;
+    var desc     = document.getElementById('desc').value.trim();
+    var location = document.getElementById('location').value.trim();
+    var date     = document.getElementById('date').value;
+    var reporter = document.getElementById('reporter').value.trim();
+    var phone    = document.getElementById('phone').value.trim();
+    var errEl    = document.getElementById('err');
+    errEl.style.display = 'none';
+
+    if (!fname||!lname||!age||!gender||!desc||!location||!date||!reporter||!phone) {
+      errEl.textContent = '⚠️ Please fill all required fields marked with *.';
+      errEl.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' }); return;
+    }
+
+    // addCase() saves to localStorage AND creates an alert automatically
+    var newCase = addCase({
+      fname:fname, lname:lname, age:age, gender:gender, desc:desc,
+      location:location, date:date,
+      time:     document.getElementById('time').value,
+      context:  document.getElementById('context').value,
+      reporter: reporter, phone:phone,
+      relation: document.getElementById('relation').value,
+      email:    document.getElementById('email').value
+    });
+
+    toast('🚨 Report submitted! Alert has been sent to all users.', 'success');
+    setTimeout(function(){ window.location.href = 'missing.html'; }, 1800);
+  }
+</script>
+</body>
+</html>

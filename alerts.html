@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeTrace – Live Alerts</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:28px; }
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; }
+  .kpi-num { font-family:'Bebas Neue'; font-size:40px; line-height:1; }
+  .kpi-lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-top:3px; }
+  .controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+  .notify-btn { padding:10px 22px; background:var(--red); color:#fff; border:none; border-radius:8px;
+    font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; }
+  .notify-btn.on { background:var(--green); }
+  .alert-item { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:22px; display:flex; gap:18px; align-items:flex-start; transition:border-color .25s; margin-bottom:14px; }
+  .alert-item:hover { border-color:var(--red); }
+  .a-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:20px; flex-shrink:0; }
+  .ic-red   { background:rgba(230,57,70,.15); }
+  .ic-green { background:rgba(46,204,113,.15); }
+  .ic-blue  { background:rgba(58,134,255,.15); }
+  .a-body   { flex:1; }
+  .a-name   { font-weight:600; font-size:15px; margin-bottom:5px; }
+  .a-desc   { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:10px; }
+  .a-tags   { display:flex; gap:8px; flex-wrap:wrap; }
+  .tag { padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+  .tag-m { background:rgba(230,57,70,.15); color:var(--red); }
+  .tag-f { background:rgba(46,204,113,.15); color:var(--green); }
+  .tag-s { background:rgba(58,134,255,.15); color:var(--blue); }
+  .tag-a { background:rgba(255,255,255,.05); color:var(--muted); }
+  .a-time { font-family:'Space Mono'; font-size:11px; color:var(--muted); white-space:nowrap; }
+  .a-meta { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+  .empty  { text-align:center; padding:60px; color:var(--muted); }
+  .new-badge { background:var(--red); color:#fff; font-size:10px; font-weight:700;
+    padding:2px 7px; border-radius:20px; margin-left:8px; animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+</style>
+</head>
+<body>
+<nav>
+  <a class="nav-logo" href="index.html">Safe<span>Trace</span></a>
+  <div class="nav-links">
+    <a href="index.html">Home</a><a href="missing.html">Missing Children</a>
+    <a href="alerts.html" class="active">Live Alerts</a>
+    <a href="report.html">Report Missing</a>
+    <a href="sighting.html">Report Sighting</a>
+  </div>
+  <div class="nav-actions" id="navGuest" style="display:flex;gap:10px">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions" id="navUser" style="display:none;gap:10px;align-items:center">
+    <span id="navGreet" style="font-size:13px;color:var(--muted)"></span>
+    <button class="btn btn-outline" onclick="doLogout()" style="padding:7px 16px;font-size:12px">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap" style="max-width:860px">
+  <div class="page-title">Live <span>Alerts</span></div>
+  <div class="page-sub">
+    Every missing report and sighting submitted by any user appears here instantly.
+    <span id="newBadge" class="new-badge" style="display:none">NEW</span>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-num" style="color:var(--red)"   id="kMissing">0</div><div class="kpi-lbl">🚨 Active Missing</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:var(--green)" id="kFound">0</div><div class="kpi-lbl">✅ Found</div></div>
+    <div class="kpi"><div class="kpi-num" style="color:var(--blue)"  id="kSightings">0</div><div class="kpi-lbl">👁 Sightings</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="notify-btn" id="notifyBtn" onclick="toggleNotify()">🔔 Enable Notifications</button>
+    <select class="form-input" id="typeFilter" onchange="renderAlerts()" style="width:auto;padding:10px 14px">
+      <option value="all">All Alerts</option>
+      <option value="missing">Missing Only</option>
+      <option value="found">Found Only</option>
+      <option value="sighting">Sightings Only</option>
+    </select>
+  </div>
+
+  <div id="alertList"></div>
+</div>
+
+<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
+<script src="data.js"></script>
+<script>
+  initNav();
+  var notifyOn = false;
+  var prevCount = 0;
+
+  window.onload = function() { refresh(); };
+
+  // Auto-refresh every 5 seconds so new reports/sightings appear
+  setInterval(function() {
+    var newCount = getAlerts().length;
+    if (newCount > prevCount && prevCount !== 0) {
+      document.getElementById('newBadge').style.display = 'inline-block';
+      toast('🔔 New alert received!', 'success');
+    }
+    prevCount = newCount;
+    refresh();
+  }, 5000);
+
+  function refresh() {
+    var cases    = getCases();
+    var sightings= getSightings();
+    document.getElementById('kMissing').textContent  = cases.filter(function(c){ return c.status==='missing'; }).length;
+    document.getElementById('kFound').textContent    = cases.filter(function(c){ return c.status==='found'; }).length;
+    document.getElementById('kSightings').textContent= sightings.length;
+    prevCount = getAlerts().length;
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    var filter = document.getElementById('typeFilter').value;
+    var alerts = getAlerts();     // reads from localStorage
+    if (filter !== 'all') alerts = alerts.filter(function(a){ return a.type === filter; });
+
+    var icons   = { missing:'🚨', found:'✅', sighting:'👁', general:'📢' };
+    var icCls   = { missing:'ic-red', found:'ic-green', sighting:'ic-blue', general:'ic-blue' };
+    var tagCls  = { missing:'tag-m', found:'tag-f', sighting:'tag-s', general:'tag-s' };
+
+    if (!alerts.length) {
+      document.getElementById('alertList').innerHTML =
+        '<div class="empty">📭 No alerts match this filter.</div>'; return;
+    }
+
+    document.getElementById('alertList').innerHTML = alerts.map(function(a){
+      return '<div class="alert-item">' +
+        '<div class="a-icon ' + icCls[a.type] + '">' + (icons[a.type]||'📢') + '</div>' +
+        '<div class="a-body">' +
+          '<div class="a-name">' + a.name + '</div>' +
+          '<div class="a-desc">'  + a.desc + '</div>' +
+          '<div class="a-tags">' +
+            '<span class="tag ' + tagCls[a.type] + '">' + a.type.toUpperCase() + '</span>' +
+            '<span class="tag tag-a">📍 ' + (a.area||'Hyderabad') + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="a-meta">' +
+          '<div class="a-time">' + timeAgo(a.createdAt) + '</div>' +
+          '<a href="missing.html" class="btn btn-outline" style="padding:6px 13px;font-size:11px;text-decoration:none">View Cases</a>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function toggleNotify() {
+    notifyOn = !notifyOn;
+    var btn = document.getElementById('notifyBtn');
+    if (notifyOn) {
+      btn.textContent = '🔕 Notifications ON'; btn.classList.add('on');
+      if ('Notification' in window) Notification.requestPermission();
+      toast('Notifications enabled for your area!', 'success');
+    } else {
+      btn.textContent = '🔔 Enable Notifications'; btn.classList.remove('on');
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeTrace – Admin Panel</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { overflow-x:hidden; }
+  .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 64px); padding-top:64px; }
+  .sidebar { background:var(--surface); border-right:1px solid var(--border);
+    padding:24px 0; position:sticky; top:64px; height:calc(100vh - 64px); overflow-y:auto; }
+  .sb-logo { font-family:'Bebas Neue'; font-size:16px; color:var(--red); letter-spacing:2px;
+    padding:0 22px 18px; border-bottom:1px solid var(--border); margin-bottom:10px; }
+  .sb-who { padding:12px 22px; background:rgba(230,57,70,.07); margin-bottom:8px; }
+  .sb-who p { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+  .sb-who strong { font-size:13px; color:var(--text); display:block; margin-top:2px; }
+  .mi { padding:13px 22px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer;
+    display:flex; align-items:center; gap:10px; transition:all .2s; border-left:3px solid transparent; }
+  .mi:hover,.mi.active { color:var(--text); background:rgba(230,57,70,.07); border-left-color:var(--red); }
+  .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700;
+    padding:1px 7px; border-radius:20px; }
+  .main { padding:36px; }
+  .main-title { font-family:'Bebas Neue'; font-size:40px; letter-spacing:2px; margin-bottom:4px; }
+  .main-sub   { font-size:13px; color:var(--muted); margin-bottom:26px; }
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:20px; }
+  .kpi-lbl { font-size:11px; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; margin-bottom:6px; }
+  .kpi-val { font-family:'Bebas Neue'; font-size:40px; line-height:1; }
+  .sec { display:none; } .sec.active { display:block; }
+  .sec-title { font-family:'Bebas Neue'; font-size:20px; letter-spacing:1px; color:var(--orange); margin-bottom:14px; }
+  .tw { background:var(--surface); border:1px solid var(--border); border-radius:13px; overflow:hidden; margin-bottom:24px; }
+  table { width:100%; border-collapse:collapse; }
+  th { padding:11px 15px; text-align:left; font-size:11px; font-weight:600; color:var(--muted);
+    letter-spacing:.8px; text-transform:uppercase; border-bottom:1px solid var(--border); }
+  td { padding:14px 15px; border-bottom:1px solid rgba(42,42,58,.5); font-size:13px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(230,57,70,.04); }
+  .ab { padding:5px 11px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;
+    border:none; margin-right:4px; transition:all .2s; }
+  .ab-v { background:rgba(58,134,255,.2); color:var(--blue); }  .ab-v:hover { background:var(--blue); color:#fff; }
+  .ab-f { background:rgba(46,204,113,.2); color:var(--green); }.ab-f:hover { background:var(--green); color:#fff; }
+  .ab-d { background:rgba(230,57,70,.2);  color:var(--red); }  .ab-d:hover { background:var(--red); color:#fff; }
+  .empty { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
+
+  /* Access info box */
+  .access-box { background:rgba(230,57,70,.07); border:1px solid rgba(230,57,70,.2);
+    border-radius:12px; padding:18px 22px; margin-bottom:28px; font-size:13px; line-height:1.7; }
+  .access-box strong { color:var(--red); }
+
+  @media(max-width:768px) {
+    .layout { grid-template-columns:1fr; }
+    .sidebar { display:none; }
+    .kpi-row { grid-template-columns:1fr 1fr; }
+    .main { padding:20px; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <a class="nav-logo" href="index.html">Safe<span>Trace</span></a>
+  <div class="nav-links">
+    <a href="index.html">Home</a><a href="missing.html">Missing Children</a>
+    <a href="alerts.html">Live Alerts</a><a href="admin.html" class="active">Admin</a>
+  </div>
+  <div class="nav-actions" style="display:flex;gap:10px;align-items:center">
+    <span id="navGreet" style="font-size:13px;color:var(--muted)"></span>
+    <button class="btn btn-outline" onclick="doLogout()" style="padding:7px 16px;font-size:12px">Logout</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-logo">🛡 Admin Panel</div>
+    <div class="sb-who">
+      <p>Logged in as</p>
+      <strong id="sbName">Admin</strong>
+    </div>
+    <div class="mi active" onclick="show('dashboard',this)">📊 Dashboard</div>
+    <div class="mi" onclick="show('reports',this)">📋 Reports <span class="badge" id="uvBadge">0</span></div>
+    <div class="mi" onclick="show('users',this)">👥 All Users</div>
+    <div class="mi" onclick="show('sightings',this)">👁 Sightings</div>
+    <div class="mi" onclick="show('sendalert',this)">📡 Send Alert</div>
+    <div style="padding:22px 22px 0;border-top:1px solid var(--border);margin-top:16px">
+      <a href="index.html" style="font-size:12px;color:var(--muted);text-decoration:none">← Back to Site</a>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="sec active" id="sec-dashboard">
+      <div class="main-title">Dashboard</div>
+      <div class="main-sub">Live overview of all data stored in the system</div>
+
+      <!-- Who can access admin — explanation -->
+      <div class="access-box">
+        🛡 <strong>Admin Access:</strong> Only users with <strong>role = "admin"</strong> can open this page.
+        Currently <strong>admin@safetrace.com</strong> is the only admin account.
+        Parents, Volunteers, and Authority users are <strong>redirected away</strong> if they try to visit this URL.
+        To make someone an admin, an existing admin must change their role in the Users table below.
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-lbl">🚨 Missing</div><div class="kpi-val" style="color:var(--red)"   id="kM">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">✅ Found</div><div class="kpi-val" style="color:var(--green)" id="kF">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">👁 Sightings</div><div class="kpi-val" style="color:var(--blue)"  id="kS">0</div></div>
+        <div class="kpi"><div class="kpi-lbl">👤 Users</div><div class="kpi-val" style="color:var(--orange)" id="kU">0</div></div>
+      </div>
+      <div class="sec-title">Recent Reports (latest 5)</div>
+      <div class="tw" id="dashTable"></div>
+    </div>
+
+    <!-- ── REPORTS ── -->
+    <div class="sec" id="sec-reports">
+      <div class="main-title">All Reports</div>
+      <div class="main-sub">Verify reports submitted by parents/volunteers. Mark children as found. Delete invalid entries.</div>
+      <div class="tw" id="reportsTable"></div>
+    </div>
+
+    <!-- ── USERS ── -->
+    <div class="sec" id="sec-users">
+      <div class="main-title">All Users</div>
+      <div class="main-sub">Everyone who has registered — parents, volunteers, authorities, and admins.</div>
+      <div class="tw" id="usersTable"></div>
+    </div>
+
+    <!-- ── SIGHTINGS ── -->
+    <div class="sec" id="sec-sightings">
+      <div class="main-title">Sighting Reports</div>
+      <div class="main-sub">All community-submitted sightings — stored in localStorage, visible here instantly.</div>
+      <div class="tw" id="sightingsTable"></div>
+    </div>
+
+    <!-- ── SEND ALERT ── -->
+    <div class="sec" id="sec-sendalert">
+      <div class="main-title">Broadcast Alert</div>
+      <div class="main-sub">Send a custom emergency alert. It will appear at the top of the Live Alerts page immediately.</div>
+      <div class="card" style="max-width:480px">
+        <div class="form-group">
+          <label class="form-label">Alert Type</label>
+          <select class="form-input" id="aType">
+            <option value="missing">New Missing Child</option>
+            <option value="found">Child Found</option>
+            <option value="sighting">Sighting Confirmed</option>
+            <option value="general">General Safety</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Alert Title (Child Name / Subject)</label>
+          <input class="form-input" id="aTitle" placeholder="e.g. Aarav Sharma">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message *</label>
+          <textarea class="form-input" id="aMsg" rows="4" placeholder="Write the alert message…"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Target Area</label>
+          <input class="form-input" id="aArea" placeholder="e.g. Hyderabad, Begumpet…">
+        </div>
+        <button class="btn-full" onclick="sendAlert()">📡 Broadcast to All Users</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
+<script src="data.js"></script>
+<script>
+  // ── Admin guard — runs before anything else ──────────────────
+ (function () {
+var u = getSession();
+
+if (!u) {
+window.location.href = "login.html";
+return;
+}
+
+if (u.role !== "admin") {
+alert("Access Denied - Admin Only");
+window.location.href = "index.html";
+return;
+}
+
+document.getElementById("navGreet").textContent = "🛡 " + u.name;
+document.getElementById("sbName").textContent = u.name + " (admin)";
+})();
+
+  function show(id, btn) {
+    document.querySelectorAll('.sec').forEach(function(s){ s.classList.remove('active'); });
+    document.querySelectorAll('.mi').forEach(function(b){ b.classList.remove('active'); });
+    document.getElementById('sec-'+id).classList.add('active');
+    btn.classList.add('active');
+    if (id === 'dashboard') loadDashboard();
+    if (id === 'reports')   loadReports();
+    if (id === 'users')     loadUsers();
+    if (id === 'sightings') loadSightings();
+  }
+
+  function loadDashboard() {
+    var cases    = getCases();
+    var sightings= getSightings();
+    var users    = getUsers();
+    document.getElementById('kM').textContent = cases.filter(function(c){ return c.status==='missing'; }).length;
+    document.getElementById('kF').textContent = cases.filter(function(c){ return c.status==='found'; }).length;
+    document.getElementById('kS').textContent = sightings.length;
+    document.getElementById('kU').textContent = users.length;
+    var unv = cases.filter(function(c){ return !c.verified; }).length;
+    document.getElementById('uvBadge').textContent = unv;
+    document.getElementById('dashTable').innerHTML = buildReportsTable(cases.slice(0,5));
+  }
+
+  function loadReports() {
+    document.getElementById('reportsTable').innerHTML = buildReportsTable(getCases());
+  }
+
+  function buildReportsTable(list) {
+    if (!list.length) return '<div class="empty">No reports yet.</div>';
+    return '<table><thead><tr><th>ID</th><th>Child</th><th>Age</th><th>Location</th><th>Date</th><th>Status</th><th>Verified</th><th>Actions</th></tr></thead><tbody>' +
+      list.map(function(c){
+        return '<tr>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + c.id + '</td>' +
+          '<td><strong>' + c.fname + ' ' + c.lname + '</strong></td>' +
+          '<td>' + c.age + '</td>' +
+          '<td style="color:var(--muted);font-size:12px">' + c.location + '</td>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + c.date + '</td>' +
+          '<td><span class="pill ' + (c.status==='missing'?'pill-missing':'pill-found') + '">' + c.status.toUpperCase() + '</span></td>' +
+          '<td>' + (c.verified ? '<span style="color:var(--green);font-size:12px">✅ Yes</span>' : '<span style="color:var(--orange);font-size:12px">⏳ No</span>') + '</td>' +
+          '<td>' +
+            (!c.verified ? '<button class="ab ab-v" onclick="doVerify(' + c.id + ')">Verify</button>' : '') +
+            (c.status==='missing' ? '<button class="ab ab-f" onclick="doFound(' + c.id + ')">Mark Found</button>' : '') +
+            '<button class="ab ab-d" onclick="doDelete(' + c.id + ')">Delete</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function loadUsers() {
+    var users = getUsers();
+    if (!users.length) { document.getElementById('usersTable').innerHTML = '<div class="empty">No users yet.</div>'; return; }
+    document.getElementById('usersTable').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Phone</th><th>Joined</th></tr></thead><tbody>' +
+      users.map(function(u){
+        return '<tr>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + u.id + '</td>' +
+          '<td><strong>' + u.name + '</strong></td>' +
+          '<td style="color:var(--muted)">' + u.email + '</td>' +
+          '<td><span class="pill ' + (u.role==='admin'?'pill-missing':'pill-found') + '">' + u.role.toUpperCase() + '</span></td>' +
+          '<td style="color:var(--muted)">' + u.phone + '</td>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + u.joined + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function loadSightings() {
+    var items = getSightings();
+    if (!items.length) { document.getElementById('sightingsTable').innerHTML = '<div class="empty">No sightings yet.</div>'; return; }
+    document.getElementById('sightingsTable').innerHTML = '<table><thead><tr><th>ID</th><th>Child</th><th>Location</th><th>Time</th><th>Reporter</th><th>Phone</th><th>Submitted</th></tr></thead><tbody>' +
+      items.map(function(s){
+        return '<tr>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + s.id + '</td>' +
+          '<td><strong>' + s.childName + '</strong></td>' +
+          '<td style="color:var(--muted)">' + s.location + '</td>' +
+          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + s.time + '</td>' +
+          '<td>' + s.reporter + '</td>' +
+          '<td style="color:var(--muted)">' + s.phone + '</td>' +
+          '<td style="font-size:12px;color:var(--muted)">' + timeAgo(s.createdAt) + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function doVerify(id) {
+    var cases = getCases();
+    cases.forEach(function(c){ if (c.id===id) c.verified = true; });
+    saveCases(cases);
+    loadDashboard(); loadReports();
+    toast('Report verified ✅', 'success');
+  }
+
+  function doFound(id) {
+    var cases = getCases();
+    var child;
+    cases.forEach(function(c){ if (c.id===id){ c.status='found'; child=c; } });
+    saveCases(cases);
+    if (child) {
+      addAlert({ type:'found', name:child.fname+' '+child.lname,
+        desc:child.fname+' has been found and returned home safely! 🎉', area:child.location, caseId:id });
+    }
+    loadDashboard(); loadReports();
+    toast((child ? child.fname : 'Child') + ' marked as FOUND! Alert sent. 🎉', 'success');
+  }
+
+  function doDelete(id) {
+    if (!confirm('Permanently delete this report?')) return;
+    var cases = getCases().filter(function(c){ return c.id !== id; });
+    saveCases(cases);
+    loadDashboard(); loadReports();
+    toast('Report deleted.', 'success');
+  }
+
+  function sendAlert() {
+    var msg   = document.getElementById('aMsg').value.trim();
+    var title = document.getElementById('aTitle').value.trim() || 'Alert';
+    if (!msg) { toast('Please enter an alert message.', 'error'); return; }
+    addAlert({
+      type:  document.getElementById('aType').value,
+      name:  title,
+      desc:  msg,
+      area:  document.getElementById('aArea').value || 'All Areas'
+    });
+    document.getElementById('aMsg').value   = '';
+    document.getElementById('aTitle').value = '';
+    document.getElementById('aArea').value  = '';
+    toast('📡 Alert broadcast! It is now live on the Alerts page.', 'success');
+  }
+</script>
+</body>
+</html>

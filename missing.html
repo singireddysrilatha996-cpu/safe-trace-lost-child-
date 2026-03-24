@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SafeTrace – Missing Children</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .filter-bar { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:28px; }
+  .fb { padding:8px 20px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+    border:1.5px solid var(--border); background:transparent; color:var(--muted); transition:all .2s; }
+  .fb.active,.fb:hover { border-color:var(--red); color:var(--red); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; transition:transform .25s,box-shadow .25s,border-color .25s; cursor:pointer; }
+  .card:hover { transform:translateY(-6px); box-shadow:0 20px 50px rgba(0,0,0,.5); border-color:var(--red); }
+  .card-img { width:100%; height:190px; display:flex; align-items:center; justify-content:center;
+    font-size:70px; background:var(--surface2); position:relative; }
+  .cs { position:absolute; top:10px; right:10px; padding:3px 11px; border-radius:20px; font-size:10px; font-weight:700; }
+  .cs-m { background:rgba(230,57,70,.2);  color:var(--red);   border:1px solid rgba(230,57,70,.35); }
+  .cs-f { background:rgba(46,204,113,.2); color:var(--green); border:1px solid rgba(46,204,113,.35); }
+  .unv  { position:absolute; top:10px; left:10px; background:rgba(244,162,97,.2); color:var(--orange);
+    border:1px solid rgba(244,162,97,.35); border-radius:20px; padding:3px 10px; font-size:10px; font-weight:700; }
+  .card-body  { padding:18px; }
+  .card-name  { font-family:'Bebas Neue'; font-size:22px; letter-spacing:1px; margin-bottom:8px; }
+  .card-meta  { font-size:12px; color:var(--muted); margin-bottom:5px; }
+  .card-btns  { display:flex; gap:8px; margin-top:14px; }
+  .bx { padding:8px 15px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;
+    border:none; transition:all .2s; }
+  .bx-red { background:var(--red); color:#fff; }  .bx-red:hover { background:#c0313d; }
+  .bx-out { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .bx-out:hover { border-color:var(--text); }
+
+  /* Detail Modal */
+  .overlay { position:fixed; inset:0; z-index:500; background:rgba(0,0,0,.82);
+    backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; padding:20px; }
+  .overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:20px;
+    padding:40px; width:100%; max-width:560px; position:relative; max-height:88vh;
+    overflow-y:auto; animation:up .3s ease; }
+  @keyframes up { from{transform:translateY(28px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .modal-close { position:absolute; top:16px; right:16px; background:none; border:none;
+    color:var(--muted); font-size:22px; cursor:pointer; }
+  .modal-close:hover { color:var(--text); }
+  .dr { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+  .di label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px;
+    font-weight:600; display:block; margin-bottom:4px; }
+  .di p { font-size:14px; }
+  .sm { background:var(--surface2); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .sm p { font-size:13px; color:var(--muted); margin-top:3px; line-height:1.5; }
+</style>
+</head>
+<body>
+<nav>
+  <a class="nav-logo" href="index.html">Safe<span>Trace</span></a>
+  <div class="nav-links">
+    <a href="index.html">Home</a>
+    <a href="missing.html" class="active">Missing Children</a>
+    <a href="alerts.html">Live Alerts</a>
+    <a href="report.html">Report Missing</a>
+    <a href="sighting.html">Report Sighting</a>
+  </div>
+  <div class="nav-actions" id="navGuest" style="display:flex;gap:10px">
+    <a href="login.html" class="btn btn-outline">Login</a>
+    <a href="register.html" class="btn btn-primary">Register</a>
+  </div>
+  <div class="nav-actions" id="navUser" style="display:none;gap:10px;align-items:center">
+    <span id="navGreet" style="font-size:13px;color:var(--muted)"></span>
+    <button class="btn btn-outline" onclick="doLogout()" style="padding:7px 16px;font-size:12px">Logout</button>
+  </div>
+</nav>
+
+<div class="page-wrap" style="max-width:1100px">
+  <div class="page-title">Missing <span>Children</span></div>
+  <div class="page-sub">All reports submitted by users — click a card to see full details. New reports appear instantly.</div>
+  <div class="filter-bar">
+    <button class="fb active" onclick="filter('all',this)">All Cases</button>
+    <button class="fb" onclick="filter('missing',this)">🚨 Missing</button>
+    <button class="fb" onclick="filter('found',this)">✅ Found</button>
+    <button class="fb" onclick="filter('verified',this)">🔒 Verified</button>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- Detail Modal -->
+<div class="overlay" id="detailModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
+<script src="data.js"></script>
+<script>
+  initNav();
+  var currentFilter = 'all';
+
+  window.onload = render;
+
+  function filter(f, btn) {
+    document.querySelectorAll('.fb').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentFilter = f;
+    render();
+  }
+
+  function render() {
+    var cases = getCases();   // reads from localStorage
+    var data  = cases;
+    if (currentFilter === 'missing')  data = cases.filter(function(c){ return c.status==='missing'; });
+    if (currentFilter === 'found')    data = cases.filter(function(c){ return c.status==='found'; });
+    if (currentFilter === 'verified') data = cases.filter(function(c){ return c.verified; });
+
+    var grid = document.getElementById('grid');
+    if (!data.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--muted)"><div style="font-size:48px;margin-bottom:12px">🔍</div><p>No cases match this filter.</p></div>';
+      return;
+    }
+    grid.innerHTML = data.map(function(c){
+      return '<div class="card" onclick="openDetail(' + c.id + ')">' +
+        '<div class="card-img">' + (c.emoji||'👦') +
+          '<div class="cs ' + (c.status==='missing'?'cs-m':'cs-f') + '">' + c.status.toUpperCase() + '</div>' +
+          (!c.verified ? '<div class="unv">UNVERIFIED</div>' : '') +
+        '</div>' +
+        '<div class="card-body">' +
+          '<div class="card-name">' + c.fname + ' ' + c.lname + '</div>' +
+          '<div class="card-meta">📅 ' + c.date + '  •  Age ' + c.age + '  •  ' + c.gender + '</div>' +
+          '<div class="card-meta">📍 ' + c.location + '</div>' +
+          '<div class="card-btns">' +
+            '<button class="bx bx-red" onclick="event.stopPropagation();openDetail(' + c.id + ')">Full Details</button>' +
+            (c.status==='missing' ? '<a class="bx bx-out" href="sighting.html?case=' + c.id + '" onclick="event.stopPropagation()">Report Sighting</a>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function openDetail(id) {
+    var cases    = getCases();
+    var sightings= getSightings();
+    var c = cases.find(function(x){ return x.id === id; });
+    if (!c) return;
+    var related = sightings.filter(function(s){ return s.caseId === id; });
+
+    document.getElementById('modalBody').innerHTML =
+      '<div style="display:flex;gap:16px;align-items:center;margin-bottom:24px">' +
+        '<div style="font-size:66px;line-height:1">' + (c.emoji||'👦') + '</div>' +
+        '<div>' +
+          '<div style="font-family:\'Bebas Neue\';font-size:32px;letter-spacing:1px">' + c.fname + ' ' + c.lname + '</div>' +
+          '<span class="pill ' + (c.status==='missing'?'pill-missing':'pill-found') + '">' + c.status.toUpperCase() + '</span>' +
+          (!c.verified ? '<span class="pill pill-pending" style="margin-left:6px">UNVERIFIED</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="dr">' +
+        '<div class="di"><label>Age & Gender</label><p>' + c.age + ' yrs • ' + c.gender + '</p></div>' +
+        '<div class="di"><label>Last Seen</label><p>' + c.date + (c.time?' @ '+c.time:'') + '</p></div>' +
+        '<div class="di" style="grid-column:1/-1"><label>Location</label><p>' + c.location + '</p></div>' +
+        '<div class="di" style="grid-column:1/-1"><label>Description</label><p style="color:var(--muted);line-height:1.6">' + c.desc + '</p></div>' +
+        (c.context ? '<div class="di" style="grid-column:1/-1"><label>Circumstances</label><p style="color:var(--muted);line-height:1.6">' + c.context + '</p></div>' : '') +
+        '<div class="di"><label>Reported By</label><p>' + c.reporter + ' (' + c.relation + ')</p></div>' +
+        '<div class="di"><label>Contact</label><p>' + c.phone + '</p></div>' +
+      '</div>' +
+      (related.length ?
+        '<div style="font-family:\'Bebas Neue\';font-size:18px;color:var(--blue);margin:16px 0 10px;letter-spacing:1px">SIGHTINGS (' + related.length + ')</div>' +
+        related.map(function(s){
+          return '<div class="sm"><strong style="font-size:13px">' + s.location + '</strong>' +
+            '<span style="font-size:11px;color:var(--muted)"> — ' + s.time + '</span>' +
+            '<p>' + s.desc + '</p></div>';
+        }).join('') : '') +
+      (c.status === 'missing' ?
+        '<a href="sighting.html?case=' + c.id + '" class="btn-full" style="display:block;text-align:center;text-decoration:none;margin-top:16px">👁 Report a Sighting for This Child</a>' : '');
+
+    document.getElementById('detailModal').classList.add('open');
+  }
+
+  function closeDetail() { document.getElementById('detailModal').classList.remove('open'); }
+</script>
+</body>
+</html>
