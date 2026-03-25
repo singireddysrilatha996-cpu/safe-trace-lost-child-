@@ -131,42 +131,7 @@
       <div class="tw" id="sightingsTable"></div>
     </div>
 
-    <!-- ── SEND ALERT ── -->
-    <div class="sec" id="sec-sendalert">
-      <div class="main-title">Broadcast Alert</div>
-      <div class="main-sub">Send a custom emergency alert. It will appear at the top of the Live Alerts page immediately.</div>
-      <div class="card" style="max-width:480px">
-        <div class="form-group">
-          <label class="form-label">Alert Type</label>
-          <select class="form-input" id="aType">
-            <option value="missing">New Missing Child</option>
-            <option value="found">Child Found</option>
-            <option value="sighting">Sighting Confirmed</option>
-            <option value="general">General Safety</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Alert Title (Child Name / Subject)</label>
-          <input class="form-input" id="aTitle" placeholder="e.g. Aarav Sharma">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Message *</label>
-          <textarea class="form-input" id="aMsg" rows="4" placeholder="Write the alert message…"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Target Area</label>
-          <input class="form-input" id="aArea" placeholder="e.g. Hyderabad, Begumpet…">
-        </div>
-        <button class="btn-full" onclick="sendAlert()">📡 Broadcast to All Users</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<div id="toast"><span id="toastIcon">✅</span>&nbsp;<span id="toastMsg"></span></div>
-<script src="data.js"></script>
-<script>
+   
   // ── Admin guard — runs before anything else ──────────────────
  (function () {
 var u = getSession();
