@@ -1,282 +1,322 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SafeTrace – Admin Panel</title>
-<link rel="stylesheet" href="style.css">
-<style>
-  body { overflow-x:hidden; }
-  .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 64px); padding-top:64px; }
-  .sidebar { background:var(--surface); border-right:1px solid var(--border);
-    padding:24px 0; position:sticky; top:64px; height:calc(100vh - 64px); overflow-y:auto; }
-  .sb-logo { font-family:'Bebas Neue'; font-size:16px; color:var(--red); letter-spacing:2px;
-    padding:0 22px 18px; border-bottom:1px solid var(--border); margin-bottom:10px; }
-  .sb-who { padding:12px 22px; background:rgba(230,57,70,.07); margin-bottom:8px; }
-  .sb-who p { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
-  .sb-who strong { font-size:13px; color:var(--text); display:block; margin-top:2px; }
-  .mi { padding:13px 22px; font-size:13px; font-weight:500; color:var(--muted); cursor:pointer;
-    display:flex; align-items:center; gap:10px; transition:all .2s; border-left:3px solid transparent; }
-  .mi:hover,.mi.active { color:var(--text); background:rgba(230,57,70,.07); border-left-color:var(--red); }
-  .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700;
-    padding:1px 7px; border-radius:20px; }
-  .main { padding:36px; }
-  .main-title { font-family:'Bebas Neue'; font-size:40px; letter-spacing:2px; margin-bottom:4px; }
-  .main-sub   { font-size:13px; color:var(--muted); margin-bottom:26px; }
-  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
-  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:13px; padding:20px; }
-  .kpi-lbl { font-size:11px; color:var(--muted); letter-spacing:.5px; text-transform:uppercase; margin-bottom:6px; }
-  .kpi-val { font-family:'Bebas Neue'; font-size:40px; line-height:1; }
-  .sec { display:none; } .sec.active { display:block; }
-  .sec-title { font-family:'Bebas Neue'; font-size:20px; letter-spacing:1px; color:var(--orange); margin-bottom:14px; }
-  .tw { background:var(--surface); border:1px solid var(--border); border-radius:13px; overflow:hidden; margin-bottom:24px; }
-  table { width:100%; border-collapse:collapse; }
-  th { padding:11px 15px; text-align:left; font-size:11px; font-weight:600; color:var(--muted);
-    letter-spacing:.8px; text-transform:uppercase; border-bottom:1px solid var(--border); }
-  td { padding:14px 15px; border-bottom:1px solid rgba(42,42,58,.5); font-size:13px; }
-  tr:last-child td { border-bottom:none; }
-  tr:hover td { background:rgba(230,57,70,.04); }
-  .ab { padding:5px 11px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;
-    border:none; margin-right:4px; transition:all .2s; }
-  .ab-v { background:rgba(58,134,255,.2); color:var(--blue); }  .ab-v:hover { background:var(--blue); color:#fff; }
-  .ab-f { background:rgba(46,204,113,.2); color:var(--green); }.ab-f:hover { background:var(--green); color:#fff; }
-  .ab-d { background:rgba(230,57,70,.2);  color:var(--red); }  .ab-d:hover { background:var(--red); color:#fff; }
-  .empty { padding:30px; text-align:center; color:var(--muted); font-size:13px; }
+/* ================================================================
+   SafeTrace — data.js
+   ALL data is stored in localStorage so it persists across
+   page reloads and navigations within the same browser.
 
-  /* Access info box */
-  .access-box { background:rgba(230,57,70,.07); border:1px solid rgba(230,57,70,.2);
-    border-radius:12px; padding:18px 22px; margin-bottom:28px; font-size:13px; line-height:1.7; }
-  .access-box strong { color:var(--red); }
+   WHAT IS STORED:
+     st_users    → registered users (array)
+     st_cases    → missing child reports (array)
+     st_sightings→ sighting reports (array)
+     st_alerts   → alert feed (array)
+     st_session  → currently logged-in user (object)
+   ================================================================ */
 
-  @media(max-width:768px) {
-    .layout { grid-template-columns:1fr; }
-    .sidebar { display:none; }
-    .kpi-row { grid-template-columns:1fr 1fr; }
-    .main { padding:20px; }
-  }
-</style>
-</head>
-<body>
-<nav>
-  <a class="nav-logo" href="index.html">Safe<span>Trace</span></a>
-  <div class="nav-links">
-    <a href="index.html">Home</a><a href="missing.html">Missing Children</a>
-    <a href="alerts.html">Live Alerts</a><a href="admin.html" class="active">Admin</a>
-  </div>
-  <div class="nav-actions" style="display:flex;gap:10px;align-items:center">
-    <span id="navGreet" style="font-size:13px;color:var(--muted)"></span>
-    <button class="btn btn-outline" onclick="doLogout()" style="padding:7px 16px;font-size:12px">Logout</button>
-  </div>
-</nav>
+// ── Seed default data on first-ever visit ───────────────────────
+(function seedIfEmpty() {
+  if (!localStorage.getItem('st_seeded')) {
 
-<div class="layout">
-  <div class="sidebar">
-    <div class="sb-logo">🛡 Admin Panel</div>
-    <div class="sb-who">
-      <p>Logged in as</p>
-      <strong id="sbName">Admin</strong>
-    </div>
-    <div class="mi active" onclick="show('dashboard',this)">📊 Dashboard</div>
-    <div class="mi" onclick="show('reports',this)">📋 Reports <span class="badge" id="uvBadge">0</span></div>
-    <div class="mi" onclick="show('users',this)">👥 All Users</div>
-    <div class="mi" onclick="show('sightings',this)">👁 Sightings</div>
-    <div class="mi" onclick="show('sendalert',this)">📡 Send Alert</div>
-    <div style="padding:22px 22px 0;border-top:1px solid var(--border);margin-top:16px">
-      <a href="index.html" style="font-size:12px;color:var(--muted);text-decoration:none">← Back to Site</a>
-    </div>
-  </div>
-
-  <div class="main">
-
-    <!-- ── DASHBOARD ── -->
-    <div class="sec active" id="sec-dashboard">
-      <div class="main-title">Dashboard</div>
-      <div class="main-sub">Live overview of all data stored in the system</div>
-
-      <!-- Who can access admin — explanation -->
-      <div class="access-box">
-        🛡 <strong>Admin Access:</strong> Only users with <strong>role = "admin"</strong> can open this page.
-        Currently <strong>admin@safetrace.com</strong> is the only admin account.
-        Parents, Volunteers, and Authority users are <strong>redirected away</strong> if they try to visit this URL.
-        To make someone an admin, an existing admin must change their role in the Users table below.
-      </div>
-
-      <div class="kpi-row">
-        <div class="kpi"><div class="kpi-lbl">🚨 Missing</div><div class="kpi-val" style="color:var(--red)"   id="kM">0</div></div>
-        <div class="kpi"><div class="kpi-lbl">✅ Found</div><div class="kpi-val" style="color:var(--green)" id="kF">0</div></div>
-        <div class="kpi"><div class="kpi-lbl">👁 Sightings</div><div class="kpi-val" style="color:var(--blue)"  id="kS">0</div></div>
-        <div class="kpi"><div class="kpi-lbl">👤 Users</div><div class="kpi-val" style="color:var(--orange)" id="kU">0</div></div>
-      </div>
-      <div class="sec-title">Recent Reports (latest 5)</div>
-      <div class="tw" id="dashTable"></div>
-    </div>
-
-    <!-- ── REPORTS ── -->
-    <div class="sec" id="sec-reports">
-      <div class="main-title">All Reports</div>
-      <div class="main-sub">Verify reports submitted by parents/volunteers. Mark children as found. Delete invalid entries.</div>
-      <div class="tw" id="reportsTable"></div>
-    </div>
-
-    <!-- ── USERS ── -->
-    <div class="sec" id="sec-users">
-      <div class="main-title">All Users</div>
-      <div class="main-sub">Everyone who has registered — parents, volunteers, authorities, and admins.</div>
-      <div class="tw" id="usersTable"></div>
-    </div>
-
-    <!-- ── SIGHTINGS ── -->
-    <div class="sec" id="sec-sightings">
-      <div class="main-title">Sighting Reports</div>
-      <div class="main-sub">All community-submitted sightings — stored in localStorage, visible here instantly.</div>
-      <div class="tw" id="sightingsTable"></div>
-    </div>
-
+    var defaultUsers = [
+      { id: 1, name: 'Admin SafeTrace', email: 'admin@safetrace.com',
+        password: 'admin1234', role: 'admin',
+        phone: '+91 98765 43210', joined: '2025-01-10' },
+      { id: 2, name: 'Ravi Kumar', email: 'user@safetrace.com',
+        password: 'user123', role: 'parent',
+        phone: '+91 90000 12345', joined: '2025-03-15' }
+    ];
    
-  // ── Admin guard — runs before anything else ──────────────────
- (function () {
-var u = getSession();
 
-if (!u) {
-window.location.href = "login.html";
-return;
-}
+    var defaultCases = [
+      { id: 1, fname:'Aarav', lname:'Sharma', age:8, gender:'Male', emoji:'👦',
+        desc:'Blue school uniform, short black hair, small scar on left cheek.',
+        location:'Jubilee Hills, Hyderabad', date:'2025-03-20', time:'14:30',
+        context:'Was playing in the park.',
+        reporter:'Sunita Sharma', phone:'+91 98001 11111', relation:'Parent',
+        status:'missing', verified:true, createdAt: Date.now() - 7200000 },
+      { id: 2, fname:'Meera', lname:'Singh', age:5, gender:'Female', emoji:'👧',
+        desc:'Pink frock, pigtails, small red schoolbag.',
+        location:'Begumpet Metro Station', date:'2025-03-21', time:'09:15',
+        context:'Separated from mother during morning rush.',
+        reporter:'Rajesh Singh', phone:'+91 98002 22222', relation:'Parent',
+        status:'missing', verified:true, createdAt: Date.now() - 64800000 },
+      { id: 3, fname:'Priya', lname:'Reddy', age:6, gender:'Female', emoji:'👧',
+        desc:'Green dress, curly hair, dimples on both cheeks.',
+        location:'Banjara Hills, Hyderabad', date:'2025-03-18', time:'16:00',
+        context:'Returned home safely.',
+        reporter:'Anita Reddy', phone:'+91 98003 33333', relation:'Parent',
+        status:'found', verified:true, createdAt: Date.now() - 172800000 },
+      { id: 4, fname:'Rohan', lname:'Kumar', age:10, gender:'Male', emoji:'👦',
+        desc:'School uniform, grey trousers, white shirt.',
+        location:'Secunderabad Bus Stand', date:'2025-03-22', time:'07:45',
+        context:'Did not return from school.',
+        reporter:'Mohan Kumar', phone:'+91 98004 44444', relation:'Parent',
+        status:'missing', verified:false, createdAt: Date.now() - 3600000 }
+    ];
 
-if (u.role !== "admin") {
-alert("Access Denied - Admin Only");
-window.location.href = "index.html";
-return;
-}
+    var defaultSightings = [
+      { id: 1, caseId:1, childName:'Aarav Sharma',
+        location:'Near Hitech City Metro', time:'2025-03-22 11:30',
+        desc:'Boy in blue near food court.', reporter:'Volunteer Priya',
+        phone:'+91 91111 00000', createdAt: Date.now() - 1800000 },
+      { id: 2, caseId:4, childName:'Rohan Kumar',
+        location:'Banjara Hills Road No.12', time:'2025-03-22 15:00',
+        desc:'School-uniform boy near park, seemed lost.', reporter:'Kiran M',
+        phone:'+91 92222 11111', createdAt: Date.now() - 3600000 }
+    ];
 
-document.getElementById("navGreet").textContent = "🛡 " + u.name;
-document.getElementById("sbName").textContent = u.name + " (admin)";
+    var defaultAlerts = [
+      { id: 1, type:'missing',  name:'Aarav Sharma', desc:'8yr boy missing from Jubilee Hills. Blue school uniform.', time:'2 hrs ago',   area:'Hyderabad', createdAt: Date.now()-7200000 },
+      { id: 2, type:'sighting', name:'Rohan Kumar',  desc:'Sighting near Banjara Hills Road No.12 at 3PM.',           time:'1 hr ago',    area:'Hyderabad', createdAt: Date.now()-3600000 },
+      { id: 3, type:'found',    name:'Priya Reddy',  desc:'6yr girl returned home safely.',                            time:'2 days ago',  area:'Hyderabad', createdAt: Date.now()-172800000 },
+      { id: 4, type:'missing',  name:'Meera Singh',  desc:'5yr girl missing, Begumpet Metro.',                         time:'18 hrs ago',  area:'Hyderabad', createdAt: Date.now()-64800000 }
+    ];
+
+    localStorage.setItem('st_users',     JSON.stringify(defaultUsers));
+    localStorage.setItem('st_cases',     JSON.stringify(defaultCases));
+    localStorage.setItem('st_sightings', JSON.stringify(defaultSightings));
+    localStorage.setItem('st_alerts',    JSON.stringify(defaultAlerts));
+    localStorage.setItem('st_seeded',    '1');
+  }
 })();
 
-  function show(id, btn) {
-    document.querySelectorAll('.sec').forEach(function(s){ s.classList.remove('active'); });
-    document.querySelectorAll('.mi').forEach(function(b){ b.classList.remove('active'); });
-    document.getElementById('sec-'+id).classList.add('active');
-    btn.classList.add('active');
-    if (id === 'dashboard') loadDashboard();
-    if (id === 'reports')   loadReports();
-    if (id === 'users')     loadUsers();
-    if (id === 'sightings') loadSightings();
-  }
+// ================================================================
+//  DATA ACCESS HELPERS
+//  These read/write directly to localStorage every call,
+//  so changes made on one page are visible on every other page.
+// ================================================================
 
-  function loadDashboard() {
-    var cases    = getCases();
-    var sightings= getSightings();
-    var users    = getUsers();
-    document.getElementById('kM').textContent = cases.filter(function(c){ return c.status==='missing'; }).length;
-    document.getElementById('kF').textContent = cases.filter(function(c){ return c.status==='found'; }).length;
-    document.getElementById('kS').textContent = sightings.length;
-    document.getElementById('kU').textContent = users.length;
-    var unv = cases.filter(function(c){ return !c.verified; }).length;
-    document.getElementById('uvBadge').textContent = unv;
-    document.getElementById('dashTable').innerHTML = buildReportsTable(cases.slice(0,5));
-  }
+function getUsers()     { return JSON.parse(localStorage.getItem('st_users')     || '[]'); }
+function getCases()     { return JSON.parse(localStorage.getItem('st_cases')     || '[]'); }
+function getSightings() { return JSON.parse(localStorage.getItem('st_sightings') || '[]'); }
+function getAlerts()    { return JSON.parse(localStorage.getItem('st_alerts')    || '[]'); }
 
-  function loadReports() {
-    document.getElementById('reportsTable').innerHTML = buildReportsTable(getCases());
-  }
+function saveUsers(arr)     { localStorage.setItem('st_users',     JSON.stringify(arr)); }
+function saveCases(arr)     { localStorage.setItem('st_cases',     JSON.stringify(arr)); }
+function saveSightings(arr) { localStorage.setItem('st_sightings', JSON.stringify(arr)); }
+function saveAlerts(arr)    { localStorage.setItem('st_alerts',    JSON.stringify(arr)); }
 
-  function buildReportsTable(list) {
-    if (!list.length) return '<div class="empty">No reports yet.</div>';
-    return '<table><thead><tr><th>ID</th><th>Child</th><th>Age</th><th>Location</th><th>Date</th><th>Status</th><th>Verified</th><th>Actions</th></tr></thead><tbody>' +
-      list.map(function(c){
-        return '<tr>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + c.id + '</td>' +
-          '<td><strong>' + c.fname + ' ' + c.lname + '</strong></td>' +
-          '<td>' + c.age + '</td>' +
-          '<td style="color:var(--muted);font-size:12px">' + c.location + '</td>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + c.date + '</td>' +
-          '<td><span class="pill ' + (c.status==='missing'?'pill-missing':'pill-found') + '">' + c.status.toUpperCase() + '</span></td>' +
-          '<td>' + (c.verified ? '<span style="color:var(--green);font-size:12px">✅ Yes</span>' : '<span style="color:var(--orange);font-size:12px">⏳ No</span>') + '</td>' +
-          '<td>' +
-            (!c.verified ? '<button class="ab ab-v" onclick="doVerify(' + c.id + ')">Verify</button>' : '') +
-            (c.status==='missing' ? '<button class="ab ab-f" onclick="doFound(' + c.id + ')">Mark Found</button>' : '') +
-            '<button class="ab ab-d" onclick="doDelete(' + c.id + ')">Delete</button>' +
-          '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table>';
-  }
+// ── Generate a unique numeric ID ────────────────────────────────
+function nextId(arr) {
+  if (!arr || !arr.length) return 1;
+  return Math.max.apply(null, arr.map(function(x){ return x.id || 0; })) + 1;
+}
 
-  function loadUsers() {
-    var users = getUsers();
-    if (!users.length) { document.getElementById('usersTable').innerHTML = '<div class="empty">No users yet.</div>'; return; }
-    document.getElementById('usersTable').innerHTML = '<table><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Phone</th><th>Joined</th></tr></thead><tbody>' +
-      users.map(function(u){
-        return '<tr>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + u.id + '</td>' +
-          '<td><strong>' + u.name + '</strong></td>' +
-          '<td style="color:var(--muted)">' + u.email + '</td>' +
-          '<td><span class="pill ' + (u.role==='admin'?'pill-missing':'pill-found') + '">' + u.role.toUpperCase() + '</span></td>' +
-          '<td style="color:var(--muted)">' + u.phone + '</td>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + u.joined + '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table>';
-  }
+// ── Time-ago string ─────────────────────────────────────────────
+function timeAgo(ts) {
+  var diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60)   return 'Just now';
+  if (diff < 3600) return Math.floor(diff/60) + ' mins ago';
+  if (diff < 86400)return Math.floor(diff/3600) + ' hrs ago';
+  return Math.floor(diff/86400) + ' days ago';
+}
 
-  function loadSightings() {
-    var items = getSightings();
-    if (!items.length) { document.getElementById('sightingsTable').innerHTML = '<div class="empty">No sightings yet.</div>'; return; }
-    document.getElementById('sightingsTable').innerHTML = '<table><thead><tr><th>ID</th><th>Child</th><th>Location</th><th>Time</th><th>Reporter</th><th>Phone</th><th>Submitted</th></tr></thead><tbody>' +
-      items.map(function(s){
-        return '<tr>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">#' + s.id + '</td>' +
-          '<td><strong>' + s.childName + '</strong></td>' +
-          '<td style="color:var(--muted)">' + s.location + '</td>' +
-          '<td style="font-family:\'Space Mono\';font-size:11px;color:var(--muted)">' + s.time + '</td>' +
-          '<td>' + s.reporter + '</td>' +
-          '<td style="color:var(--muted)">' + s.phone + '</td>' +
-          '<td style="font-size:12px;color:var(--muted)">' + timeAgo(s.createdAt) + '</td>' +
-        '</tr>';
-      }).join('') + '</tbody></table>';
+// ================================================================
+//  USER REGISTRATION
+//  Adds a new user to localStorage and returns it (or error msg).
+// ================================================================
+function registerUser(fname, lname, email, password, phone, role) {
+  var users = getUsers();
+  if (users.find(function(u){ return u.email.toLowerCase() === email.toLowerCase(); })) {
+    return { error: 'This email is already registered. Please login.' };
   }
+  var newUser = {
+    id:     nextId(users),
+    name:   fname + ' ' + lname,
+    email:  email,
+    password: password,
+    role:   role || 'parent',
+    phone:  phone || '',
+    joined: new Date().toISOString().split('T')[0]
+  };
+  users.push(newUser);
+  saveUsers(users);
+  return { user: newUser };
+}
 
-  function doVerify(id) {
-    var cases = getCases();
-    cases.forEach(function(c){ if (c.id===id) c.verified = true; });
-    saveCases(cases);
-    loadDashboard(); loadReports();
-    toast('Report verified ✅', 'success');
-  }
-
-  function doFound(id) {
-    var cases = getCases();
-    var child;
-    cases.forEach(function(c){ if (c.id===id){ c.status='found'; child=c; } });
-    saveCases(cases);
-    if (child) {
-      addAlert({ type:'found', name:child.fname+' '+child.lname,
-        desc:child.fname+' has been found and returned home safely! 🎉', area:child.location, caseId:id });
+// ================================================================
+//  USER LOGIN
+//  Returns the user object or null.
+// ================================================================
+function loginUser(email, password) {
+  var users = getUsers();
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email.toLowerCase() === email.toLowerCase() &&
+        users[i].password === password) {
+      return users[i];
     }
-    loadDashboard(); loadReports();
-    toast((child ? child.fname : 'Child') + ' marked as FOUND! Alert sent. 🎉', 'success');
   }
+  return null;
+}
 
-  function doDelete(id) {
-    if (!confirm('Permanently delete this report?')) return;
-    var cases = getCases().filter(function(c){ return c.id !== id; });
-    saveCases(cases);
-    loadDashboard(); loadReports();
-    toast('Report deleted.', 'success');
-  }
+// ================================================================
+//  REPORT A MISSING CHILD
+// ================================================================
+function addCase(data) {
+  var cases = getCases();
+  var newCase = {
+    id:        nextId(cases),
+    fname:     data.fname,
+    lname:     data.lname,
+    age:       parseInt(data.age),
+    gender:    data.gender,
+    emoji:     data.gender === 'Male' ? '👦' : '👧',
+    desc:      data.desc,
+    location:  data.location,
+    date:      data.date,
+    time:      data.time     || '',
+    context:   data.context  || '',
+    reporter:  data.reporter,
+    phone:     data.phone,
+    relation:  data.relation || 'Parent',
+    email:     data.email    || '',
+    status:    'missing',
+    verified:  false,
+    createdAt: Date.now()
+  };
+  cases.unshift(newCase);   // newest first
+  saveCases(cases);
 
-  function sendAlert() {
-    var msg   = document.getElementById('aMsg').value.trim();
-    var title = document.getElementById('aTitle').value.trim() || 'Alert';
-    if (!msg) { toast('Please enter an alert message.', 'error'); return; }
-    addAlert({
-      type:  document.getElementById('aType').value,
-      name:  title,
-      desc:  msg,
-      area:  document.getElementById('aArea').value || 'All Areas'
-    });
-    document.getElementById('aMsg').value   = '';
-    document.getElementById('aTitle').value = '';
-    document.getElementById('aArea').value  = '';
-    toast('📡 Alert broadcast! It is now live on the Alerts page.', 'success');
+  // Auto-create an alert
+  addAlert({
+    type:  'missing',
+    name:  newCase.fname + ' ' + newCase.lname,
+    desc:  newCase.age + 'yr old ' + newCase.gender.toLowerCase() +
+           ' reported missing from ' + newCase.location + '.',
+    area:  newCase.location,
+    caseId: newCase.id
+  });
+
+  return newCase;
+}
+
+// ================================================================
+//  ADD A SIGHTING
+// ================================================================
+function addSighting(data) {
+  var sightings = getSightings();
+  var newS = {
+    id:        nextId(sightings),
+    caseId:    parseInt(data.caseId),
+    childName: data.childName,
+    location:  data.location,
+    time:      data.time,
+    desc:      data.desc,
+    reporter:  data.reporter,
+    phone:     data.phone,
+    createdAt: Date.now()
+  };
+  sightings.unshift(newS);
+  saveSightings(sightings);
+
+  // Auto-create an alert
+  addAlert({
+    type:  'sighting',
+    name:  data.childName,
+    desc:  'Sighting reported near ' + data.location + '.',
+    area:  data.location,
+    caseId: parseInt(data.caseId)
+  });
+
+  return newS;
+}
+
+// ================================================================
+//  ADD AN ALERT
+// ================================================================
+function addAlert(data) {
+  var alerts = getAlerts();
+  alerts.unshift({
+    id:        nextId(alerts),
+    type:      data.type,
+    name:      data.name,
+    desc:      data.desc,
+    area:      data.area || 'Hyderabad',
+    caseId:    data.caseId || null,
+    createdAt: Date.now(),
+    time:      'Just now'
+  });
+  saveAlerts(alerts);
+}
+
+// ================================================================
+//  SESSION  —  uses sessionStorage (lives for the browser tab)
+// ================================================================
+var SESSION_KEY = 'st_session';
+
+function setSession(userObj) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(userObj)); } catch(e) {}
+}
+function getSession() {
+  try {
+    var raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+function clearSession() {
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+// Redirect to login if not logged in; save return URL
+function requireLogin() {
+  if (!getSession()) {
+    sessionStorage.setItem('st_redirect', window.location.href);
+    window.location.href = 'login.html';
+    return false;
   }
-</script>
-</body>
-</html>
+  return true;
+}
+
+// Only admin can access admin page
+function requireAdmin() {
+  var u = getSession();
+  if (!u) {
+    sessionStorage.setItem('st_redirect', window.location.href);
+    window.location.href = 'login.html';
+    return false;
+  }
+  if (u.role !== 'admin') {
+    alert('Admin access only. You are logged in as: ' + u.role);
+    window.location.href = 'index.html';
+    return false;
+  }
+  return true;
+}
+
+function doLogout() {
+  clearSession();
+  window.location.href = 'index.html';
+}
+
+// ================================================================
+//  NAV HELPER  —  call initNav() on each page to show user state
+// ================================================================
+function initNav() {
+  var u       = getSession();
+  var guestEl = document.getElementById('navGuest');
+  var userEl  = document.getElementById('navUser');
+  var greetEl = document.getElementById('navGreet');
+  if (!guestEl) return;
+  if (u) {
+    guestEl.style.display = 'none';
+    userEl.style.display  = 'flex';
+    if (greetEl) greetEl.textContent = 'Hi, ' + u.name.split(' ')[0] +
+      (u.role === 'admin' ? ' 🛡' : '');
+  } else {
+    guestEl.style.display = 'flex';
+    userEl.style.display  = 'none';
+  }
+}
+
+// ================================================================
+//  TOAST  —  call toast('msg', 'success'|'error') on any page
+// ================================================================
+function toast(msg, type) {
+  var el    = document.getElementById('toast');
+  var icon  = document.getElementById('toastIcon');
+  var msgEl = document.getElementById('toastMsg');
+  if (!el) return;
+  if (icon)  icon.textContent  = type === 'error' ? '❌' : '✅';
+  if (msgEl) msgEl.textContent = msg;
+  el.className = 'show ' + (type || 'success');
+  clearTimeout(el._t);
+  el._t = setTimeout(function(){ el.classList.remove('show'); }, 3600);
+}
